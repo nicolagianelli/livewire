@@ -370,9 +370,7 @@
     if (key === "")
       return object;
     return key.split(".").reduce((carry, i) => {
-      if (carry === void 0)
-        return void 0;
-      return carry[i];
+      return carry?.[i];
     }, object);
   }
   function dataSet(object, key, value) {
@@ -457,6 +455,9 @@
   function splitDumpFromContent(content) {
     let dump = content.match(/.*<script>Sfdump\(".+"\)<\/script>/s);
     return [dump, content.replace(dump, "")];
+  }
+  function quickHash(subject) {
+    return btoa(encodeURIComponent(subject));
   }
 
   // js/features/supportFileUploads.js
@@ -4365,7 +4366,8 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
     "upload": "$upload",
     "uploadMultiple": "$uploadMultiple",
     "removeUpload": "$removeUpload",
-    "cancelUpload": "$cancelUpload"
+    "cancelUpload": "$cancelUpload",
+    "isLoading": "$isLoading"
   };
   function generateWireObject(component, state) {
     return new Proxy({}, {
@@ -4417,6 +4419,38 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
   });
   wireProperty("__instance", (component) => component);
   wireProperty("$get", (component) => (property, reactive3 = true) => dataGet(reactive3 ? component.reactive : component.ephemeral, property));
+  wireProperty("$isLoading", (component) => (options) => {
+    if (component.reactive.__pendingCalls === void 0 || component.reactive.__pendingUpdates === void 0) {
+      return false;
+    }
+    if (options && options.targets) {
+      let hasTarget = false;
+      let target;
+      let params;
+      for (let i = 0; i < options.targets.length; i++) {
+        target = options.targets[i];
+        if (target.includes("(") && target.includes(")")) {
+          params = target.substring(target.indexOf("(") + 1, target.indexOf(")"));
+          target = target.substring(0, target.indexOf("("));
+          if (component.reactive.__pendingCalls.some((call) => call.method === target && quickHash(call.params) === quickHash(params))) {
+            hasTarget = true;
+            break;
+          }
+        } else {
+          if (Object.keys(component.reactive.__pendingUpdates).includes(target)) {
+            hasTarget = true;
+            break;
+          }
+          if (component.reactive.__pendingCalls.some((call) => call.method === target)) {
+            hasTarget = true;
+            break;
+          }
+        }
+      }
+      return options.except ? !hasTarget : hasTarget;
+    }
+    return component.reactive.__pendingCalls.length > 0 || Object.keys(component.reactive.__pendingUpdates).length > 0;
+  });
   wireProperty("$el", (component) => {
     return component.el;
   });
@@ -4771,7 +4805,7 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
     }
   };
 
-  // ../../../../usr/local/lib/node_modules/@alpinejs/collapse/dist/module.esm.js
+  // ../alpine/packages/collapse/dist/module.esm.js
   function src_default2(Alpine3) {
     Alpine3.directive("collapse", collapse);
     collapse.inline = (el, { modifiers }) => {
@@ -4821,7 +4855,7 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
             start: { height: current + "px" },
             end: { height: full + "px" }
           }, () => el._x_isShown = true, () => {
-            if (el.getBoundingClientRect().height == full) {
+            if (Math.abs(el.getBoundingClientRect().height - full) < 1) {
               el.style.overflow = null;
             }
           });
@@ -4865,7 +4899,7 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
   }
   var module_default2 = src_default2;
 
-  // ../../../../usr/local/lib/node_modules/@alpinejs/focus/dist/module.esm.js
+  // ../alpine/packages/focus/dist/module.esm.js
   var candidateSelectors = ["input", "select", "textarea", "a[href]", "button", "[tabindex]:not(slot)", "audio[controls]", "video[controls]", '[contenteditable]:not([contenteditable="false"])', "details>summary:first-of-type", "details"];
   var candidateSelector = /* @__PURE__ */ candidateSelectors.join(",");
   var NoElement = typeof Element === "undefined";
@@ -5814,7 +5848,7 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
   }
   var module_default3 = src_default3;
 
-  // ../../../../usr/local/lib/node_modules/@alpinejs/persist/dist/module.esm.js
+  // ../alpine/packages/persist/dist/module.esm.js
   function src_default4(Alpine3) {
     let persist = () => {
       let alias;
@@ -5876,7 +5910,7 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
   }
   var module_default4 = src_default4;
 
-  // ../../../../usr/local/lib/node_modules/@alpinejs/intersect/dist/module.esm.js
+  // ../alpine/packages/intersect/dist/module.esm.js
   function src_default5(Alpine3) {
     Alpine3.directive("intersect", Alpine3.skipDuringClone((el, { value, expression, modifiers }, { evaluateLater: evaluateLater2, cleanup: cleanup2 }) => {
       let evaluate3 = evaluateLater2(expression);
@@ -8520,7 +8554,7 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
   }
   var module_default8 = src_default8;
 
-  // ../../../../usr/local/lib/node_modules/@alpinejs/mask/dist/module.esm.js
+  // ../alpine/packages/mask/dist/module.esm.js
   function src_default9(Alpine3) {
     Alpine3.directive("mask", (el, { value, expression }, { effect: effect3, evaluateLater: evaluateLater2, cleanup: cleanup2 }) => {
       let templateFn = () => expression;
@@ -9349,6 +9383,16 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
     });
   });
 
+  // js/features/supportLoading.js
+  on2("commit", ({ component, commit: payload, respond }) => {
+    component.reactive.__pendingCalls = payload.calls;
+    component.reactive.__pendingUpdates = payload.updates;
+    respond(() => {
+      delete component.reactive.__pendingCalls;
+      delete component.reactive.__pendingUpdates;
+    });
+  });
+
   // js/directives/wire-transition.js
   on2("morph.added", ({ el }) => {
     el.__addedByMorph = true;
@@ -9648,9 +9692,6 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
       directives2.all().filter((i) => !nonActionOrModelLivewireDirectives.includes(i.value)).map((i) => i.expression.split("(")[0]).forEach((target) => targets.push({ target }));
     }
     return { targets, inverted };
-  }
-  function quickHash(subject) {
-    return btoa(encodeURIComponent(subject));
   }
 
   // js/directives/wire-stream.js

@@ -3,7 +3,7 @@ import { dispatch, dispatchSelf, dispatchTo, listen } from '@/events'
 import { generateEntangleFunction } from '@/features/supportEntangle'
 import { closestComponent } from '@/store'
 import { requestCommit, requestCall } from '@/request'
-import { dataGet, dataSet } from '@/utils'
+import { dataGet, dataSet, quickHash } from '@/utils'
 import Alpine from 'alpinejs'
 
 let properties = {}
@@ -36,6 +36,7 @@ let aliases = {
     'uploadMultiple': '$uploadMultiple',
     'removeUpload': '$removeUpload',
     'cancelUpload': '$cancelUpload',
+    'isLoading': '$isLoading',
 }
 
 export function generateWireObject(component, state) {
@@ -104,6 +105,41 @@ Alpine.magic('wire', (el, { cleanup }) => {
 wireProperty('__instance', (component) => component)
 
 wireProperty('$get', (component) => (property, reactive = true) => dataGet(reactive ? component.reactive : component.ephemeral, property))
+
+wireProperty('$isLoading', (component) => (options) => {
+    if(component.reactive.__pendingCalls === undefined || component.reactive.__pendingUpdates === undefined) {
+        return false
+    }
+
+    if(options && options.targets) {
+        let hasTarget = false
+        let target
+        let params
+        for(let i = 0; i < options.targets.length; i++) {
+            target = options.targets[i]
+            if(target.includes('(') && target.includes(')')) {
+                params = target.substring(target.indexOf('(') + 1, target.indexOf(')'))
+                target = target.substring(0, target.indexOf('('))
+                if(component.reactive.__pendingCalls.some(call => call.method === target && quickHash(call.params) === quickHash(params))) {
+                    hasTarget = true
+                    break
+                }
+            } else {
+                if(Object.keys(component.reactive.__pendingUpdates).includes(target)) {
+                    hasTarget = true
+                    break
+                }
+                if(component.reactive.__pendingCalls.some(call => call.method === target)) {
+                    hasTarget = true
+                    break
+                }
+            }
+        }
+
+        return options.except ? !hasTarget : hasTarget
+    }
+    return component.reactive.__pendingCalls.length > 0 || Object.keys(component.reactive.__pendingUpdates).length > 0
+})
 
 wireProperty('$el', (component) => {
     return component.el

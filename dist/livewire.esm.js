@@ -3822,9 +3822,9 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
   }
 });
 
-// ../../../../usr/local/lib/node_modules/@alpinejs/collapse/dist/module.cjs.js
+// ../alpine/packages/collapse/dist/module.cjs.js
 var require_module_cjs2 = __commonJS({
-  "../../../../usr/local/lib/node_modules/@alpinejs/collapse/dist/module.cjs.js"(exports, module) {
+  "../alpine/packages/collapse/dist/module.cjs.js"(exports, module) {
     var __defProp2 = Object.defineProperty;
     var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
     var __getOwnPropNames2 = Object.getOwnPropertyNames;
@@ -3897,7 +3897,7 @@ var require_module_cjs2 = __commonJS({
               start: { height: current + "px" },
               end: { height: full + "px" }
             }, () => el._x_isShown = true, () => {
-              if (el.getBoundingClientRect().height == full) {
+              if (Math.abs(el.getBoundingClientRect().height - full) < 1) {
                 el.style.overflow = null;
               }
             });
@@ -3943,9 +3943,9 @@ var require_module_cjs2 = __commonJS({
   }
 });
 
-// ../../../../usr/local/lib/node_modules/@alpinejs/focus/dist/module.cjs.js
+// ../alpine/packages/focus/dist/module.cjs.js
 var require_module_cjs3 = __commonJS({
-  "../../../../usr/local/lib/node_modules/@alpinejs/focus/dist/module.cjs.js"(exports, module) {
+  "../alpine/packages/focus/dist/module.cjs.js"(exports, module) {
     var __create2 = Object.create;
     var __defProp2 = Object.defineProperty;
     var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
@@ -4945,9 +4945,9 @@ var require_module_cjs3 = __commonJS({
   }
 });
 
-// ../../../../usr/local/lib/node_modules/@alpinejs/persist/dist/module.cjs.js
+// ../alpine/packages/persist/dist/module.cjs.js
 var require_module_cjs4 = __commonJS({
-  "../../../../usr/local/lib/node_modules/@alpinejs/persist/dist/module.cjs.js"(exports, module) {
+  "../alpine/packages/persist/dist/module.cjs.js"(exports, module) {
     var __defProp2 = Object.defineProperty;
     var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
     var __getOwnPropNames2 = Object.getOwnPropertyNames;
@@ -5034,9 +5034,9 @@ var require_module_cjs4 = __commonJS({
   }
 });
 
-// ../../../../usr/local/lib/node_modules/@alpinejs/intersect/dist/module.cjs.js
+// ../alpine/packages/intersect/dist/module.cjs.js
 var require_module_cjs5 = __commonJS({
-  "../../../../usr/local/lib/node_modules/@alpinejs/intersect/dist/module.cjs.js"(exports, module) {
+  "../alpine/packages/intersect/dist/module.cjs.js"(exports, module) {
     var __defProp2 = Object.defineProperty;
     var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
     var __getOwnPropNames2 = Object.getOwnPropertyNames;
@@ -7088,9 +7088,9 @@ var require_module_cjs8 = __commonJS({
   }
 });
 
-// ../../../../usr/local/lib/node_modules/@alpinejs/mask/dist/module.cjs.js
+// ../alpine/packages/mask/dist/module.cjs.js
 var require_module_cjs9 = __commonJS({
-  "../../../../usr/local/lib/node_modules/@alpinejs/mask/dist/module.cjs.js"(exports, module) {
+  "../alpine/packages/mask/dist/module.cjs.js"(exports, module) {
     var __defProp2 = Object.defineProperty;
     var __getOwnPropDesc2 = Object.getOwnPropertyDescriptor;
     var __getOwnPropNames2 = Object.getOwnPropertyNames;
@@ -7356,9 +7356,7 @@ function dataGet(object, key) {
   if (key === "")
     return object;
   return key.split(".").reduce((carry, i) => {
-    if (carry === void 0)
-      return void 0;
-    return carry[i];
+    return carry?.[i];
   }, object);
 }
 function dataSet(object, key, value) {
@@ -7443,6 +7441,9 @@ function contentIsFromDump(content) {
 function splitDumpFromContent(content) {
   let dump = content.match(/.*<script>Sfdump\(".+"\)<\/script>/s);
   return [dump, content.replace(dump, "")];
+}
+function quickHash(subject) {
+  return btoa(encodeURIComponent(subject));
 }
 
 // js/features/supportFileUploads.js
@@ -8180,7 +8181,8 @@ var aliases = {
   "upload": "$upload",
   "uploadMultiple": "$uploadMultiple",
   "removeUpload": "$removeUpload",
-  "cancelUpload": "$cancelUpload"
+  "cancelUpload": "$cancelUpload",
+  "isLoading": "$isLoading"
 };
 function generateWireObject(component, state) {
   return new Proxy({}, {
@@ -8232,6 +8234,38 @@ import_alpinejs2.default.magic("wire", (el, { cleanup }) => {
 });
 wireProperty("__instance", (component) => component);
 wireProperty("$get", (component) => (property, reactive = true) => dataGet(reactive ? component.reactive : component.ephemeral, property));
+wireProperty("$isLoading", (component) => (options) => {
+  if (component.reactive.__pendingCalls === void 0 || component.reactive.__pendingUpdates === void 0) {
+    return false;
+  }
+  if (options && options.targets) {
+    let hasTarget = false;
+    let target;
+    let params;
+    for (let i = 0; i < options.targets.length; i++) {
+      target = options.targets[i];
+      if (target.includes("(") && target.includes(")")) {
+        params = target.substring(target.indexOf("(") + 1, target.indexOf(")"));
+        target = target.substring(0, target.indexOf("("));
+        if (component.reactive.__pendingCalls.some((call) => call.method === target && quickHash(call.params) === quickHash(params))) {
+          hasTarget = true;
+          break;
+        }
+      } else {
+        if (Object.keys(component.reactive.__pendingUpdates).includes(target)) {
+          hasTarget = true;
+          break;
+        }
+        if (component.reactive.__pendingCalls.some((call) => call.method === target)) {
+          hasTarget = true;
+          break;
+        }
+      }
+    }
+    return options.except ? !hasTarget : hasTarget;
+  }
+  return component.reactive.__pendingCalls.length > 0 || Object.keys(component.reactive.__pendingUpdates).length > 0;
+});
 wireProperty("$el", (component) => {
   return component.el;
 });
@@ -10246,6 +10280,16 @@ on("effect", ({ effects }) => {
   });
 });
 
+// js/features/supportLoading.js
+on("commit", ({ component, commit: payload, respond }) => {
+  component.reactive.__pendingCalls = payload.calls;
+  component.reactive.__pendingUpdates = payload.updates;
+  respond(() => {
+    delete component.reactive.__pendingCalls;
+    delete component.reactive.__pendingUpdates;
+  });
+});
+
 // js/directives/wire-transition.js
 var import_alpinejs11 = __toESM(require_module_cjs());
 on("morph.added", ({ el }) => {
@@ -10548,9 +10592,6 @@ function getTargets(el) {
     directives.all().filter((i) => !nonActionOrModelLivewireDirectives.includes(i.value)).map((i) => i.expression.split("(")[0]).forEach((target) => targets.push({ target }));
   }
   return { targets, inverted };
-}
-function quickHash(subject) {
-  return btoa(encodeURIComponent(subject));
 }
 
 // js/directives/wire-stream.js
