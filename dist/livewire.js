@@ -459,6 +459,22 @@
   function quickHash(subject) {
     return btoa(encodeURIComponent(subject));
   }
+  function parseOutMethodAndParams(rawMethod) {
+    let method = rawMethod;
+    let params = [];
+    const methodAndParamString = method.match(/(.*?)\((.*)\)/s);
+    if (methodAndParamString) {
+      method = methodAndParamString[1];
+      let func = new Function("$event", `return (function () {
+            for (var l=arguments.length, p=new Array(l), k=0; k<l; k++) {
+                p[k] = arguments[k];
+            }
+            return [].concat(p);
+        })(${methodAndParamString[2]})`);
+      params = func(this.eventContext);
+    }
+    return { method, params };
+  }
 
   // js/features/supportFileUploads.js
   var uploadManagers = /* @__PURE__ */ new WeakMap();
@@ -4426,13 +4442,11 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
     if (options && options.targets) {
       let hasTarget = false;
       let target;
-      let params;
       for (let i = 0; i < options.targets.length; i++) {
         target = options.targets[i];
         if (target.includes("(") && target.includes(")")) {
-          params = target.substring(target.indexOf("(") + 1, target.indexOf(")"));
-          target = target.substring(0, target.indexOf("("));
-          if (component.reactive.__pendingCalls.some((call) => call.method === target && quickHash(call.params) === quickHash(params))) {
+          const { method, params } = parseOutMethodAndParams(target);
+          if (component.reactive.__pendingCalls.some((call) => call.method === method && quickHash(JSON.stringify(call.params)) === quickHash(JSON.stringify(params)))) {
             hasTarget = true;
             break;
           }
@@ -4780,28 +4794,12 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
       this.expression = this.el.getAttribute(this.rawName);
     }
     get method() {
-      const { method } = this.parseOutMethodAndParams(this.expression);
+      const { method } = parseOutMethodAndParams(this.expression);
       return method;
     }
     get params() {
-      const { params } = this.parseOutMethodAndParams(this.expression);
+      const { params } = parseOutMethodAndParams(this.expression);
       return params;
-    }
-    parseOutMethodAndParams(rawMethod) {
-      let method = rawMethod;
-      let params = [];
-      const methodAndParamString = method.match(/(.*?)\((.*)\)/s);
-      if (methodAndParamString) {
-        method = methodAndParamString[1];
-        let func = new Function("$event", `return (function () {
-                for (var l=arguments.length, p=new Array(l), k=0; k<l; k++) {
-                    p[k] = arguments[k];
-                }
-                return [].concat(p);
-            })(${methodAndParamString[2]})`);
-        params = func(this.eventContext);
-      }
-      return { method, params };
     }
   };
 
@@ -9679,6 +9677,7 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
       if (directive3.modifiers.includes("except"))
         inverted = true;
       if (raw2.includes("(") && raw2.includes(")")) {
+        console.log(directive3);
         targets.push({ target: directive3.method, params: quickHash(JSON.stringify(directive3.params)) });
       } else if (raw2.includes(",")) {
         raw2.split(",").map((i) => i.trim()).forEach((target) => {

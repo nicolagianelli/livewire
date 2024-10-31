@@ -3,7 +3,7 @@ import { dispatch, dispatchSelf, dispatchTo, listen } from '@/events'
 import { generateEntangleFunction } from '@/features/supportEntangle'
 import { closestComponent } from '@/store'
 import { requestCommit, requestCall } from '@/request'
-import { dataGet, dataSet, quickHash } from '@/utils'
+import { dataGet, dataSet, quickHash, parseOutMethodAndParams } from '@/utils'
 import Alpine from 'alpinejs'
 
 let properties = {}
@@ -114,13 +114,12 @@ wireProperty('$isLoading', (component) => (options) => {
     if(options && options.targets) {
         let hasTarget = false
         let target
-        let params
         for(let i = 0; i < options.targets.length; i++) {
             target = options.targets[i]
             if(target.includes('(') && target.includes(')')) {
-                params = target.substring(target.indexOf('(') + 1, target.indexOf(')'))
-                target = target.substring(0, target.indexOf('('))
-                if(component.reactive.__pendingCalls.some(call => call.method === target && quickHash(call.params) === quickHash(params))) {
+                let {method, params} = parseOutMethodAndParams(target)
+                params = quickHash(JSON.stringify(params))
+                if(component.reactive.__pendingCalls.some(call => call.method === method && quickHash(JSON.stringify(call.params)) === params)) {
                     hasTarget = true
                     break
                 }
