@@ -4445,8 +4445,9 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
       for (let i = 0; i < options.targets.length; i++) {
         target = options.targets[i];
         if (target.includes("(") && target.includes(")")) {
-          const { method, params } = parseOutMethodAndParams(target);
-          if (component.reactive.__pendingCalls.some((call) => call.method === method && quickHash(JSON.stringify(call.params)) === quickHash(JSON.stringify(params)))) {
+          let { method, params } = parseOutMethodAndParams(target);
+          params = quickHash(JSON.stringify(params));
+          if (component.reactive.__pendingCalls.some((call) => call.method === method && quickHash(JSON.stringify(call.params)) === params)) {
             hasTarget = true;
             break;
           }
@@ -9687,7 +9688,6 @@ ${expression ? 'Expression: "' + expression + '"\n\n' : ""}`, el);
       if (directive3.modifiers.includes("except"))
         inverted = true;
       if (raw2.includes("(") && raw2.includes(")")) {
-        console.log(directive3);
         targets.push({ target: directive3.method, params: quickHash(JSON.stringify(directive3.params)) });
       } else if (raw2.includes(",")) {
         raw2.split(",").map((i) => i.trim()).forEach((target) => {

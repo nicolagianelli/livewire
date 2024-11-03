@@ -8263,8 +8263,9 @@ wireProperty("$isLoading", (component) => (options) => {
     for (let i = 0; i < options.targets.length; i++) {
       target = options.targets[i];
       if (target.includes("(") && target.includes(")")) {
-        const { method, params } = parseOutMethodAndParams(target);
-        if (component.reactive.__pendingCalls.some((call) => call.method === method && quickHash(JSON.stringify(call.params)) === quickHash(JSON.stringify(params)))) {
+        let { method, params } = parseOutMethodAndParams(target);
+        params = quickHash(JSON.stringify(params));
+        if (component.reactive.__pendingCalls.some((call) => call.method === method && quickHash(JSON.stringify(call.params)) === params)) {
           hasTarget = true;
           break;
         }
@@ -10587,7 +10588,6 @@ function getTargets(el) {
     if (directive2.modifiers.includes("except"))
       inverted = true;
     if (raw.includes("(") && raw.includes(")")) {
-      console.log(directive2);
       targets.push({ target: directive2.method, params: quickHash(JSON.stringify(directive2.params)) });
     } else if (raw.includes(",")) {
       raw.split(",").map((i) => i.trim()).forEach((target) => {
